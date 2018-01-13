@@ -3,13 +3,13 @@ package event.generator.scheduler;
 import event.generator.model.ParkingLot;
 import event.generator.model.ParkingLotEvent;
 import event.generator.model.ParkingLotType;
+import event.generator.service.ParkingLotEventSender;
 import event.generator.service.ParkingLotService;
 import lombok.extern.java.Log;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-import javax.annotation.PostConstruct;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -24,28 +24,25 @@ import static java.util.Objects.nonNull;
 @Log
 public class EventGenerationScheduler {
     private final ParkingLotService parkingLotService;
+    private final ParkingLotEventSender parkingLotEventSender;
     private List<Long> parkingLotIds;
     private Random random = new Random(System.currentTimeMillis());
 
     @Autowired
-    public EventGenerationScheduler(ParkingLotService parkingLotService) {
+    public EventGenerationScheduler(ParkingLotService parkingLotService, ParkingLotEventSender parkingLotEventSender) {
         this.parkingLotService = parkingLotService;
+        this.parkingLotEventSender = parkingLotEventSender;
     }
 
-    @PostConstruct
-    public void init() {
-        log.info("Post construct");
+    @Scheduled(fixedRate = 5000)
+    public void reportCurrentTime() {
+        log.info("Generating event :) ");
 
         List<ParkingLot> allParkingLots = parkingLotService.getAllParkingLots();
 
         parkingLotIds = allParkingLots.stream()
                 .map(ParkingLot::getId)
                 .collect(Collectors.toList());
-    }
-
-    @Scheduled(fixedRate = 5000)
-    public void reportCurrentTime() {
-        log.info("Generating event :) ");
 
         if (parkingLotIds.size() < 1) return;
 
@@ -70,7 +67,7 @@ public class EventGenerationScheduler {
 
             ParkingLotEvent.ParkingLotEventBuilder builder = ParkingLotEvent.builder();
 
-            if (spotsOccupied == spotsAvailable || (random.nextInt(100) < 50 && spotsOccupied>1)) {
+            if (spotsOccupied == spotsAvailable || (random.nextInt(100) < 50 && spotsOccupied > 1)) {
                 builder.eventType(OCCUPY);
             } else {
                 builder.eventType(FREE);
@@ -91,8 +88,8 @@ public class EventGenerationScheduler {
     }
 
     private void sendToQueue(ParkingLotEvent event) {
-        //TODO implement sending to queue here
         log.info("Sending event to queue");
+        parkingLotEventSender.send(event);
     }
 
 }
